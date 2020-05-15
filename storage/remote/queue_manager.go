@@ -1008,7 +1008,7 @@ func (s *shards) sendSamplesWithBackoff(ctx context.Context, samples []prompb.Ti
 	return nil
 }
 
-func sendWriteRequestWithBackoff(ctx context.Context, cfg config.QueueConfig, s StorageClient, l log.Logger, req []byte, reportFailureFunc func()) (elapsed float64, err error) {
+func sendWriteRequestWithBackoff(ctx context.Context, cfg config.QueueConfig, s func() StorageClient, l log.Logger, req []byte, reportFailureFunc func()) (elapsed float64, err error) {
 	backoff := cfg.MinBackoff
 
 	for {
@@ -1019,7 +1019,7 @@ func sendWriteRequestWithBackoff(ctx context.Context, cfg config.QueueConfig, s 
 		}
 
 		begin := time.Now()
-		err := s.Store(ctx, req)
+		err := s().Store(ctx, req)
 		elapsed = time.Since(begin).Seconds()
 
 		if err == nil {
