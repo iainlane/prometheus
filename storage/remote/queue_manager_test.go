@@ -123,7 +123,7 @@ func TestSampleDelivery(t *testing.T) {
 	testutil.Ok(t, s.ApplyConfig(conf))
 	hash, err := toHash(writeConfig)
 	testutil.Ok(t, err)
-	qm := s.rws.queues[hash]
+	qm := s.Write.queues[hash]
 	qm.SetClient(c)
 
 	qm.StoreSeries(series, 0)

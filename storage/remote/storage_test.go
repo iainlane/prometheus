@@ -54,7 +54,7 @@ func TestStorageLifecycle(t *testing.T) {
 	testutil.Ok(t, s.ApplyConfig(conf))
 
 	// make sure remote write has a queue.
-	testutil.Equals(t, 1, len(s.rws.queues))
+	testutil.Equals(t, 1, len(s.Write.queues))
 
 	// make sure remote write has a queue.
 	testutil.Equals(t, 1, len(s.queryables))
