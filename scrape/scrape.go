@@ -820,7 +820,8 @@ func (c *scrapeCache) iterDone(flushCache bool) {
 	c.seriesPrev, c.seriesCur = c.seriesCur, c.seriesPrev
 
 	// We have to delete every single key in the map.
-	for k := range c.seriesCur {
+	for k, lset := range c.seriesCur {
+		intern.ReleaseLabels(intern.Global, lset)
 		delete(c.seriesCur, k)
 	}
 }
@@ -838,6 +839,7 @@ func (c *scrapeCache) addRef(met string, ref uint64, lset labels.Labels, hash ui
 	if ref == 0 {
 		return
 	}
+	intern.InternLabels(intern.Global, lset)
 	c.series[met] = &cacheEntry{ref: ref, lastIter: c.iter, lset: lset, hash: hash}
 }
 
@@ -855,6 +857,7 @@ func (c *scrapeCache) getDropped(met string) bool {
 }
 
 func (c *scrapeCache) trackStaleness(hash uint64, lset labels.Labels) {
+	intern.InternLabels(intern.Global, lset)
 	c.seriesCur[hash] = lset
 }
 
@@ -1350,7 +1353,6 @@ loop:
 			}
 		}
 
-		intern.InternLabels(intern.Global, lset)
 		ref, err = app.Append(ref, lset, t, v)
 		sampleAdded, err = sl.checkAddError(ce, met, tp, err, &sampleLimitErr, &appErrs)
 		if err != nil {
@@ -1560,7 +1562,6 @@ func (sl *scrapeLoop) addReportSample(app storage.Appender, s string, t int64, v
 	switch errors.Cause(err) {
 	case nil:
 		if !ok {
-			intern.InternLabels(intern.Global, lset)
 			sl.cache.addRef(s, ref, lset, lset.Hash())
 		}
 		return nil
