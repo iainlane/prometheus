@@ -20,6 +20,8 @@ package intern
 
 import (
 	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -88,4 +90,70 @@ func TestIntern_MultiRef_Concurrent(t *testing.T) {
 	interner.mtx.RUnlock()
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
+}
+
+func BenchmarkIntern(b *testing.B) {
+	var (
+		r        = rand.New(rand.NewSource(1))
+		interner = New(nil).(*pool)
+	)
+
+	strings := generateStrings(r, b)
+
+	internCh := make(chan string)
+	releaseCh := make(chan string)
+
+	go func() {
+		for _, s := range strings {
+			internCh <- s
+		}
+		close(internCh)
+
+		for _, s := range strings {
+			releaseCh <- s
+		}
+		close(releaseCh)
+	}()
+
+	var (
+		wg         sync.WaitGroup
+		numWorkers = 10
+	)
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			for s := range internCh {
+				interner.Intern(s)
+			}
+			for s := range releaseCh {
+				interner.Release(s)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+}
+
+func generateStrings(r *rand.Rand, b *testing.B) []string {
+	b.Helper()
+	b.StopTimer()
+	defer b.StartTimer()
+
+	strings := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		strings[i] = randStringRunes(r, 10)
+	}
+	return strings
+}
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randStringRunes(r *rand.Rand, n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[r.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
