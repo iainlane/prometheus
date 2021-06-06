@@ -32,7 +32,10 @@ func TestIntern(t *testing.T) {
 	interner := New(nil).(*pool)
 	testString := "TestIntern"
 	interner.Intern(testString)
-	interned, ok := interner.pool[testString]
+
+	stripe := interner.lockFor(hash(testString))
+	interned, ok := interner.pools[stripe][testString]
+	interner.unlockFor(hash(testString))
 
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
@@ -42,14 +45,15 @@ func TestIntern_MultiRef(t *testing.T) {
 	interner := New(nil).(*pool)
 	testString := "TestIntern_MultiRef"
 
-	interner.Intern(testString)
-	interned, ok := interner.pool[testString]
+	stripe := interner.lockFor(hash(testString))
+	interned, ok := interner.pools[stripe][testString]
+	interner.unlockFor(hash(testString))
 
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
 
 	interner.Intern(testString)
-	interned, ok = interner.pool[testString]
+	interned, ok = interner.pools[stripe][testString]
 
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(2), interned.refs.Load(), fmt.Sprintf("expected refs to be 2 but it was %d", interned.refs.Load()))
@@ -59,14 +63,15 @@ func TestIntern_DeleteRef(t *testing.T) {
 	interner := New(nil).(*pool)
 	testString := "TestIntern_DeleteRef"
 
-	interner.Intern(testString)
-	interned, ok := interner.pool[testString]
+	stripe := interner.lockFor(hash(testString))
+	interned, ok := interner.pools[stripe][testString]
+	interner.unlockFor(hash(testString))
 
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
 
 	interner.Release(testString)
-	_, ok = interner.pool[testString]
+	_, ok = interner.pools[stripe][testString]
 	require.Equal(t, false, ok)
 }
 
@@ -75,7 +80,9 @@ func TestIntern_MultiRef_Concurrent(t *testing.T) {
 	testString := "TestIntern_MultiRef_Concurrent"
 
 	interner.Intern(testString)
-	interned, ok := interner.pool[testString]
+	stripe := interner.lockFor(hash(testString))
+	interned, ok := interner.pools[stripe][testString]
+	interner.unlockFor(hash(testString))
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
 
@@ -85,9 +92,9 @@ func TestIntern_MultiRef_Concurrent(t *testing.T) {
 
 	time.Sleep(time.Millisecond)
 
-	interner.mtx.RLock()
-	interned, ok = interner.pool[testString]
-	interner.mtx.RUnlock()
+	interner.lockFor(hash(testString))
+	interned, ok = interner.pools[stripe][testString]
+	interner.unlockFor(hash(testString))
 	require.Equal(t, true, ok)
 	require.Equal(t, int64(1), interned.refs.Load(), fmt.Sprintf("expected refs to be 1 but it was %d", interned.refs.Load()))
 }
